@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "appchg:block/ultimate_energy_cell_1"
+  }
+}
