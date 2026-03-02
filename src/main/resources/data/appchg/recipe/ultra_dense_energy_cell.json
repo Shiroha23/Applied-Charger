@@ -15,7 +15,7 @@
     "aaa"
   ],
   "result": {
-    "item": "appchg:ultra_dense_energy_cell"
+    "id": "appchg:ultra_dense_energy_cell"
   },
   "show_notification": true
 }

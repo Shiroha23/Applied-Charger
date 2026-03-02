@@ -15,7 +15,7 @@
     "aaa"
   ],
   "result": {
-    "item": "appchg:ultimate_energy_cell"
+    "id": "appchg:ultimate_energy_cell"
   },
   "show_notification": true
 }

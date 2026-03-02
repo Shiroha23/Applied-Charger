@@ -8,122 +8,108 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-import net.minecraftforge.registries.DeferredRegister;
-import net.minecraftforge.registries.ForgeRegistries;
-import net.minecraftforge.registries.RegistryObject;
-import java.util.concurrent.atomic.AtomicReference;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
+import net.neoforged.neoforge.registries.DeferredRegister;
 
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
+
+import appeng.block.AEBaseEntityBlock;
 import appeng.block.networking.EnergyCellBlock;
 import appeng.block.networking.EnergyCellBlockItem;
 import appeng.blockentity.networking.EnergyCellBlockEntity;
 import appeng.blockentity.AEBaseBlockEntity;
+import appeng.blockentity.ClientTickingBlockEntity;
+import appeng.blockentity.ServerTickingBlockEntity;
+import appeng.api.ids.AEComponents;
+import appeng.api.AECapabilities;
+import appeng.api.networking.IInWorldGridNodeHost;
 import appeng.init.client.InitItemModelsProperties;
 
-// The value here should match an entry in the META-INF/mods.toml file
 @Mod(Appchg.MODID)
 public class Appchg {
 
-    // Define mod id in a common place for everything to reference
     public static final String MODID = "appchg";
-    // Create a Deferred Register to hold Blocks which will all be registered under the "appchg" namespace
-    public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(ForgeRegistries.BLOCKS, MODID);
-    // Create a Deferred Register to hold Items which will all be registered under the "appchg" namespace
-    public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, MODID);
-    public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES = DeferredRegister.create(ForgeRegistries.BLOCK_ENTITY_TYPES, MODID);
-    // Create a Deferred Register to hold CreativeModeTabs which will all be registered under the "appchg" namespace
+    private static final BlockEntityTicker<EnergyCellBlockEntity> SERVER_TICKER =
+            ServerTickingBlockEntity.class.isAssignableFrom(EnergyCellBlockEntity.class)
+                    ? (level, pos, state, entity) -> ((ServerTickingBlockEntity) entity).serverTick()
+                    : null;
+    private static final BlockEntityTicker<EnergyCellBlockEntity> CLIENT_TICKER =
+            ClientTickingBlockEntity.class.isAssignableFrom(EnergyCellBlockEntity.class)
+                    ? (level, pos, state, entity) -> ((ClientTickingBlockEntity) entity).clientTick()
+                    : null;
+
+    public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(Registries.BLOCK, MODID);
+    public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(Registries.ITEM, MODID);
+    public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES = DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, MODID);
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
 
-    public static final RegistryObject<Block> ULTRA_DENSE_ENERGY_CELL = BLOCKS.register("ultra_dense_energy_cell",
+    public static final Supplier<Block> ULTRA_DENSE_ENERGY_CELL = BLOCKS.register("ultra_dense_energy_cell",
             () -> new EnergyCellBlock(12800000, 3200, 12800));
-    public static final RegistryObject<Item> ULTRA_DENSE_ENERGY_CELL_ITEM = ITEMS.register("ultra_dense_energy_cell",
+    public static final Supplier<Item> ULTRA_DENSE_ENERGY_CELL_ITEM = ITEMS.register("ultra_dense_energy_cell",
             () -> new EnergyCellBlockItem(ULTRA_DENSE_ENERGY_CELL.get(), new Item.Properties()));
 
-    public static final RegistryObject<Block> ULTIMATE_ENERGY_CELL = BLOCKS.register("ultimate_energy_cell",
+    public static final Supplier<Block> ULTIMATE_ENERGY_CELL = BLOCKS.register("ultimate_energy_cell",
             () -> new EnergyCellBlock(102400000, 6400, 102400));
-    public static final RegistryObject<Item> ULTIMATE_ENERGY_CELL_ITEM = ITEMS.register("ultimate_energy_cell",
+    public static final Supplier<Item> ULTIMATE_ENERGY_CELL_ITEM = ITEMS.register("ultimate_energy_cell",
             () -> new EnergyCellBlockItem(ULTIMATE_ENERGY_CELL.get(), new Item.Properties()));
 
-        // Register a creative mode tab for our items
-        public static final RegistryObject<CreativeModeTab> APPCHG_TAB = CREATIVE_MODE_TABS.register("appchg_tab",
+    public static final Supplier<BlockEntityType<EnergyCellBlockEntity>> ULTRA_DENSE_ENERGY_CELL_BLOCK_ENTITY = registerEnergyCellBlockEntity(
+            "ultra_dense_energy_cell", ULTRA_DENSE_ENERGY_CELL, ULTRA_DENSE_ENERGY_CELL_ITEM);
+    public static final Supplier<BlockEntityType<EnergyCellBlockEntity>> ULTIMATE_ENERGY_CELL_BLOCK_ENTITY = registerEnergyCellBlockEntity(
+            "ultimate_energy_cell", ULTIMATE_ENERGY_CELL, ULTIMATE_ENERGY_CELL_ITEM);
+
+    public static final Supplier<CreativeModeTab> APPCHG_TAB = CREATIVE_MODE_TABS.register("appchg_tab",
             () -> CreativeModeTab.builder()
                 .icon(() -> new ItemStack(ULTRA_DENSE_ENERGY_CELL_ITEM.get()))
                 .title(Component.translatable("itemGroup.appchg"))
                 .displayItems((parameters, output) -> {
-                output.accept(ULTRA_DENSE_ENERGY_CELL_ITEM.get());
-                ItemStack ultraDenseFilled = new ItemStack(ULTRA_DENSE_ENERGY_CELL_ITEM.get());
-                var ultraDenseTag = ultraDenseFilled.getOrCreateTag();
-                ultraDenseTag.putDouble("internalCurrentPower", 1.28E7d);
-                ultraDenseTag.putDouble("internalMaxPower", 1.28E7d);
-                output.accept(ultraDenseFilled);
-                output.accept(ULTIMATE_ENERGY_CELL_ITEM.get());
-                ItemStack ultimateFilled = new ItemStack(ULTIMATE_ENERGY_CELL_ITEM.get());
-                var ultimateTag = ultimateFilled.getOrCreateTag();
-                ultimateTag.putDouble("internalCurrentPower", 1.024E8d);
-                ultimateTag.putDouble("internalMaxPower", 1.024E8d);
-                output.accept(ultimateFilled);
+                    output.accept(ULTRA_DENSE_ENERGY_CELL_ITEM.get());
+                    ItemStack ultraDenseFilled = new ItemStack(ULTRA_DENSE_ENERGY_CELL_ITEM.get());
+                    ultraDenseFilled.set(AEComponents.STORED_ENERGY, 1.28E7d);
+                    output.accept(ultraDenseFilled);
+
+                    output.accept(ULTIMATE_ENERGY_CELL_ITEM.get());
+                    ItemStack ultimateFilled = new ItemStack(ULTIMATE_ENERGY_CELL_ITEM.get());
+                    ultimateFilled.set(AEComponents.STORED_ENERGY, 1.024E8d);
+                    output.accept(ultimateFilled);
                 }).build());
 
-    public static final RegistryObject<BlockEntityType<EnergyCellBlockEntity>> ULTRA_DENSE_ENERGY_CELL_BLOCK_ENTITY = BLOCK_ENTITIES.register(
-            "ultra_dense_energy_cell",
-            () -> {
-            AtomicReference<BlockEntityType<EnergyCellBlockEntity>> typeHolder = new AtomicReference<>();
-            var supplier = (BlockEntityType.BlockEntitySupplier<EnergyCellBlockEntity>)
-                (pos, state) -> new EnergyCellBlockEntity(typeHolder.get(), pos, state);
-            var type = BlockEntityType.Builder.of(
-                supplier,
-                ULTRA_DENSE_ENERGY_CELL.get())
-                .build(null);
-            typeHolder.set(type);
-            return type;
-            });
-
-    public static final RegistryObject<BlockEntityType<EnergyCellBlockEntity>> ULTIMATE_ENERGY_CELL_BLOCK_ENTITY = BLOCK_ENTITIES.register(
-            "ultimate_energy_cell",
-            () -> {
-            AtomicReference<BlockEntityType<EnergyCellBlockEntity>> typeHolder = new AtomicReference<>();
-            var supplier = (BlockEntityType.BlockEntitySupplier<EnergyCellBlockEntity>)
-                (pos, state) -> new EnergyCellBlockEntity(typeHolder.get(), pos, state);
-            var type = BlockEntityType.Builder.of(
-                supplier,
-                ULTIMATE_ENERGY_CELL.get())
-                .build(null);
-            typeHolder.set(type);
-            return type;
-            });
-
-    public Appchg() {
-        IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
-
-        // Register the commonSetup method for modloading
-        modEventBus.addListener(this::commonSetup);
-
-        // Register the Deferred Register to the mod event bus so blocks get registered
+    public Appchg(IEventBus modEventBus) {
         BLOCKS.register(modEventBus);
-        // Register the Deferred Register to the mod event bus so items get registered
         ITEMS.register(modEventBus);
         BLOCK_ENTITIES.register(modEventBus);
         CREATIVE_MODE_TABS.register(modEventBus);
     }
 
-    private void commonSetup(final FMLCommonSetupEvent event) {
-        event.enqueueWork(() -> {
-            var ultraDenseType = ULTRA_DENSE_ENERGY_CELL_BLOCK_ENTITY.get();
-            var ultimateType = ULTIMATE_ENERGY_CELL_BLOCK_ENTITY.get();
-            ((EnergyCellBlock) ULTRA_DENSE_ENERGY_CELL.get()).setBlockEntity(EnergyCellBlockEntity.class, ultraDenseType, null, null);
-            ((EnergyCellBlock) ULTIMATE_ENERGY_CELL.get()).setBlockEntity(EnergyCellBlockEntity.class, ultimateType, null, null);
-            AEBaseBlockEntity.registerBlockEntityItem(ultraDenseType, ULTRA_DENSE_ENERGY_CELL_ITEM.get());
-            AEBaseBlockEntity.registerBlockEntityItem(ultimateType, ULTIMATE_ENERGY_CELL_ITEM.get());
+    private static Supplier<BlockEntityType<EnergyCellBlockEntity>> registerEnergyCellBlockEntity(
+            String id,
+                        Supplier<Block> blockSupplier,
+                        Supplier<Item> itemSupplier) {
+        return BLOCK_ENTITIES.register(id, () -> {
+            AtomicReference<BlockEntityType<EnergyCellBlockEntity>> typeHolder = new AtomicReference<>();
+            BlockEntityType.BlockEntitySupplier<EnergyCellBlockEntity> supplier = (pos, state) ->
+                                        new EnergyCellBlockEntity(typeHolder.get(), pos, state);
+
+            var type = BlockEntityType.Builder.of(supplier, blockSupplier.get()).build(null);
+            typeHolder.set(type);
+
+                        var block = (AEBaseEntityBlock<EnergyCellBlockEntity>) blockSupplier.get();
+                        block.setBlockEntity(EnergyCellBlockEntity.class, type, CLIENT_TICKER, SERVER_TICKER);
+                        AEBaseBlockEntity.registerBlockEntityItem(type, itemSupplier.get());
+
+            return type;
         });
     }
 
-    @Mod.EventBusSubscriber(modid = MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+    @EventBusSubscriber(modid = MODID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
     public static class ClientModEvents {
 
         @SubscribeEvent
@@ -135,6 +121,7 @@ public class Appchg {
                         double maxPower = energyCell.getAEMaxPower(stack);
                         return (float) (curPower / maxPower);
                     });
+
             ItemProperties.register(ULTIMATE_ENERGY_CELL_ITEM.get(), InitItemModelsProperties.ENERGY_FILL_LEVEL_ID,
                     (stack, level, entity, seed) -> {
                         var energyCell = (EnergyCellBlockItem) ULTIMATE_ENERGY_CELL_ITEM.get();
@@ -144,5 +131,21 @@ public class Appchg {
                     });
         }
     }
+
+        @EventBusSubscriber(modid = MODID, bus = EventBusSubscriber.Bus.MOD)
+        public static class CommonModEvents {
+
+                @SubscribeEvent
+                public static void onRegisterCapabilities(RegisterCapabilitiesEvent event) {
+                        event.registerBlockEntity(
+                                        AECapabilities.IN_WORLD_GRID_NODE_HOST,
+                                        ULTRA_DENSE_ENERGY_CELL_BLOCK_ENTITY.get(),
+                                        (object, context) -> (IInWorldGridNodeHost) object);
+                        event.registerBlockEntity(
+                                        AECapabilities.IN_WORLD_GRID_NODE_HOST,
+                                        ULTIMATE_ENERGY_CELL_BLOCK_ENTITY.get(),
+                                        (object, context) -> (IInWorldGridNodeHost) object);
+                }
+        }
 }
 
