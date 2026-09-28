@@ -1,8 +1,15 @@
 package com.shiroha23.appchg;
 
-import net.minecraft.client.renderer.item.ItemProperties;
+import com.mojang.serialization.MapCodec;
+
+import org.jetbrains.annotations.Nullable;
+
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.renderer.item.properties.numeric.RangeSelectItemModelProperty;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.entity.ItemOwner;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -14,8 +21,8 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
+import net.neoforged.neoforge.client.event.RegisterRangeSelectItemModelPropertyEvent;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
 import java.util.concurrent.atomic.AtomicReference;
@@ -31,7 +38,6 @@ import appeng.blockentity.ServerTickingBlockEntity;
 import appeng.api.ids.AEComponents;
 import appeng.api.AECapabilities;
 import appeng.api.networking.IInWorldGridNodeHost;
-import appeng.init.client.InitItemModelsProperties;
 
 @Mod(Appchg.MODID)
 public class Appchg {
@@ -46,20 +52,20 @@ public class Appchg {
                     ? (level, pos, state, entity) -> ((ClientTickingBlockEntity) entity).clientTick()
                     : null;
 
-    public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(Registries.BLOCK, MODID);
-    public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(Registries.ITEM, MODID);
+    public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(MODID);
+    public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MODID);
     public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES = DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, MODID);
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
 
-    public static final Supplier<Block> ULTRA_DENSE_ENERGY_CELL = BLOCKS.register("ultra_dense_energy_cell",
-            () -> new EnergyCellBlock(12800000, 3200, 12800));
-    public static final Supplier<Item> ULTRA_DENSE_ENERGY_CELL_ITEM = ITEMS.register("ultra_dense_energy_cell",
-            () -> new EnergyCellBlockItem(ULTRA_DENSE_ENERGY_CELL.get(), new Item.Properties()));
+    public static final Supplier<Block> ULTRA_DENSE_ENERGY_CELL = BLOCKS.registerBlock("ultra_dense_energy_cell",
+            properties -> new EnergyCellBlock(properties, 12800000, 3200, 12800));
+    public static final Supplier<Item> ULTRA_DENSE_ENERGY_CELL_ITEM = ITEMS.registerItem("ultra_dense_energy_cell",
+            properties -> new EnergyCellBlockItem(ULTRA_DENSE_ENERGY_CELL.get(), properties.useBlockDescriptionPrefix()));
 
-    public static final Supplier<Block> ULTIMATE_ENERGY_CELL = BLOCKS.register("ultimate_energy_cell",
-            () -> new EnergyCellBlock(102400000, 6400, 102400));
-    public static final Supplier<Item> ULTIMATE_ENERGY_CELL_ITEM = ITEMS.register("ultimate_energy_cell",
-            () -> new EnergyCellBlockItem(ULTIMATE_ENERGY_CELL.get(), new Item.Properties()));
+    public static final Supplier<Block> ULTIMATE_ENERGY_CELL = BLOCKS.registerBlock("ultimate_energy_cell",
+            properties -> new EnergyCellBlock(properties, 102400000, 6400, 102400));
+    public static final Supplier<Item> ULTIMATE_ENERGY_CELL_ITEM = ITEMS.registerItem("ultimate_energy_cell",
+            properties -> new EnergyCellBlockItem(ULTIMATE_ENERGY_CELL.get(), properties.useBlockDescriptionPrefix()));
 
     public static final Supplier<BlockEntityType<EnergyCellBlockEntity>> ULTRA_DENSE_ENERGY_CELL_BLOCK_ENTITY = registerEnergyCellBlockEntity(
             "ultra_dense_energy_cell", ULTRA_DENSE_ENERGY_CELL, ULTRA_DENSE_ENERGY_CELL_ITEM);
@@ -89,6 +95,7 @@ public class Appchg {
         CREATIVE_MODE_TABS.register(modEventBus);
     }
 
+    @SuppressWarnings("unchecked")
     private static Supplier<BlockEntityType<EnergyCellBlockEntity>> registerEnergyCellBlockEntity(
             String id,
                         Supplier<Block> blockSupplier,
@@ -98,7 +105,7 @@ public class Appchg {
             BlockEntityType.BlockEntitySupplier<EnergyCellBlockEntity> supplier = (pos, state) ->
                                         new EnergyCellBlockEntity(typeHolder.get(), pos, state);
 
-            var type = BlockEntityType.Builder.of(supplier, blockSupplier.get()).build(null);
+            var type = new BlockEntityType<>(supplier, blockSupplier.get());
             typeHolder.set(type);
 
                         var block = (AEBaseEntityBlock<EnergyCellBlockEntity>) blockSupplier.get();
@@ -109,30 +116,37 @@ public class Appchg {
         });
     }
 
-    @EventBusSubscriber(modid = MODID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+    @EventBusSubscriber(modid = MODID, value = Dist.CLIENT)
     public static class ClientModEvents {
 
         @SubscribeEvent
-        public static void onClientSetup(FMLClientSetupEvent event) {
-            ItemProperties.register(ULTRA_DENSE_ENERGY_CELL_ITEM.get(), InitItemModelsProperties.ENERGY_FILL_LEVEL_ID,
-                    (stack, level, entity, seed) -> {
-                        var energyCell = (EnergyCellBlockItem) ULTRA_DENSE_ENERGY_CELL_ITEM.get();
-                        double curPower = energyCell.getAECurrentPower(stack);
-                        double maxPower = energyCell.getAEMaxPower(stack);
-                        return (float) (curPower / maxPower);
-                    });
-
-            ItemProperties.register(ULTIMATE_ENERGY_CELL_ITEM.get(), InitItemModelsProperties.ENERGY_FILL_LEVEL_ID,
-                    (stack, level, entity, seed) -> {
-                        var energyCell = (EnergyCellBlockItem) ULTIMATE_ENERGY_CELL_ITEM.get();
-                        double curPower = energyCell.getAECurrentPower(stack);
-                        double maxPower = energyCell.getAEMaxPower(stack);
-                        return (float) (curPower / maxPower);
-                    });
+        public static void onRegisterItemModelProperties(RegisterRangeSelectItemModelPropertyEvent event) {
+            event.register(EnergyFillLevelProperty.ID, EnergyFillLevelProperty.CODEC);
         }
     }
 
-        @EventBusSubscriber(modid = MODID, bus = EventBusSubscriber.Bus.MOD)
+    private static final class EnergyFillLevelProperty implements RangeSelectItemModelProperty {
+        private static final Identifier ID = Identifier.parse("appchg:energy_fill_level");
+        private static final MapCodec<EnergyFillLevelProperty> CODEC = MapCodec.unit(EnergyFillLevelProperty::new);
+
+        @Override
+        public float get(ItemStack stack, @Nullable ClientLevel level, @Nullable ItemOwner owner, int seed) {
+            if (stack.getItem() instanceof EnergyCellBlockItem energyCell) {
+                double currentPower = energyCell.getAECurrentPower(stack);
+                double maxPower = energyCell.getAEMaxPower(stack);
+                return (float) (currentPower / maxPower);
+            }
+
+            return 0;
+        }
+
+        @Override
+        public MapCodec<? extends RangeSelectItemModelProperty> type() {
+            return CODEC;
+        }
+    }
+
+        @EventBusSubscriber(modid = MODID)
         public static class CommonModEvents {
 
                 @SubscribeEvent

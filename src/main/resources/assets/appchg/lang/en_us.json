@@ -1,5 +1,7 @@
 {
   "itemGroup.appchg": "Applied Charger",
   "block.appchg.ultra_dense_energy_cell": "Ultra Dense Energy Cell",
-  "block.appchg.ultimate_energy_cell": "Ultimate Energy Cell"
+  "block.appchg.ultimate_energy_cell": "Ultimate Energy Cell",
+  "item.appchg.ultra_dense_energy_cell": "Ultra Dense Energy Cell",
+  "item.appchg.ultimate_energy_cell": "Ultimate Energy Cell"
 }

@@ -2,12 +2,8 @@
   "type": "minecraft:crafting_shaped",
   "category": "misc",
   "key": {
-    "a": {
-      "item": "appchg:ultra_dense_energy_cell"
-    },
-    "b": {
-      "item": "ae2:engineering_processor"
-    }
+    "a": "appchg:ultra_dense_energy_cell",
+    "b": "ae2:engineering_processor"
   },
   "pattern": [
     "aaa",
@@ -16,6 +12,5 @@
   ],
   "result": {
     "id": "appchg:ultimate_energy_cell"
-  },
-  "show_notification": true
+  }
 }
